@@ -33,6 +33,7 @@ const {catchAsync} = require("./utils");
 const sessionSQL = require('express-mysql-session')(session);
 const rateLimit = require("express-rate-limit");
 const fs = require("fs");
+const geoip = require('geoip-lite');
 let activeRequests = new Map();
 let fileIDCache = new Map();
 if (web.Base_URL)
@@ -232,8 +233,11 @@ app.cacheDatabase = async function cacheDatabase() {
 
     app.set('users', users)
     app.set('userCache', userCache)
-    if (!ready)
+    if (!ready) {
+        geoip.reloadDataSync();
+        geoip.startWatchingDataUpdate();
         printLine("Init", `Initial System Cacahe Complete, Server is now available!`, 'info');
+    }
     ready = true;
 }
 setInterval(app.cacheDatabase, 60000)
