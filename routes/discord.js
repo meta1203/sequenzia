@@ -288,7 +288,7 @@ async function roleGeneration(id, res, req, type, authToken) {
     if (thisUser && config.disable_esm) {
         continueLogin();
     } else if (thisUser) {
-        const ip_address = getRequestIpAddress(req) || null;
+        const ip_address = (req.headers['x-real-ip']) ? req.headers['x-real-ip'] : (req.headers['x-forwarded-for']) ? req.headers['x-forwarded-for'] : null;
         if (!ip_address) {
             printLine("AuthorizationGenerator", `User ${id} can not login! IP Address could not resolve!`, 'warn');
             loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
