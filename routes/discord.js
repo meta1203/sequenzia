@@ -307,10 +307,22 @@ async function roleGeneration(id, res, req, type, authToken) {
         } else {
             const geo = geoip.lookup(ip_address);
             const ua = req.get('User-Agent');
-            if (config.esm_allow_nogeo || (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) || (ua && geo && ((geo.city !== '' && geo.region !== '') || config.esm_allow_nocity))) {
+            if (config.esm_kick_on_jump && req.session.loggedin && req.session.esm_key && req.session.esm_key === md5(thisUser.discord.user.id + ip_address + req.sessionID)) {
+                printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} has changed sense the last session!`, 'warn');
+                loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
+                delete res.locals.thisUser;
+                delete req.session.userid;
+                req.session.loggedin = false;
+                thisUser = undefined;
+            } else if (config.esm_allow_nogeo ||
+                (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) ||
+                (ua && geo &&
+                    ((geo.city !== '' && geo.region !== '') || config.esm_allow_nocity)
+                )
+            ) {
                 req.session.esm_verified = true;
                 req.session.esm_key = md5(thisUser.discord.user.id + ip_address + req.sessionID);
-                console.log(ip);
+                console.log(ip_address);
                 console.log(geo);
                 console.log(ua);
                 continueLogin();
