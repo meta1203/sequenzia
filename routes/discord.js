@@ -266,6 +266,13 @@ router.post('/update', sessionVerification, async (req, res) => {
 });
 router.post('/persistent/settings', persistSettingsManager);
 
+async function esmVerify(id, req) {
+    const ip_address = (req.headers['x-real-ip']) ? req.headers['x-real-ip'] : (req.headers['x-forwarded-for']) ? req.headers['x-forwarded-for'] : null;
+    if (config.esm_noverifyjumpping || (req.session.esm_key && req.session.esm_key === md5(id + ip_address + req.sessionID))) {
+        return true;
+    }
+    return false;
+}
 async function roleGeneration(id, res, req, type, authToken) {
     let thisUser = app.get('userCache').rows.filter(e => id === e.userid).map(e => e.data)[0];
     req.session.esm_verified = false;
@@ -300,13 +307,15 @@ async function roleGeneration(id, res, req, type, authToken) {
         } else {
             const geo = geoip.lookup(ip_address);
             const ua = req.get('User-Agent');
-            if (config.esm_allow_nogeo || (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) ||(ua && geo && ((geo.city !== '' && geo.region !== '') || config.esm_allow_nocity))) {
+            if (config.esm_allow_nogeo || (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) || (ua && geo && ((geo.city !== '' && geo.region !== '') || config.esm_allow_nocity))) {
                 req.session.esm_verified = true;
+                req.session.esm_key = md5(thisUser.discord.user.id + ip_address + req.sessionID);
+                console.log(ip);
                 console.log(geo);
                 console.log(ua);
                 continueLogin();
                 sqlPromiseSafe(`INSERT INTO sequenzia_login_history SET ? ON DUPLICATE KEY UPDATE reauth_count = reauth_count + 1, reauth_time = CURRENT_TIMESTAMP`, [{
-                    key: md5(thisUser.discord.user.id + ip_address + req.sessionID),
+                    key: req.session.esm_key,
                     session: req.sessionID,
                     id: thisUser.discord.user.id,
                     ip_address: ip_address,
@@ -517,9 +526,9 @@ async function sessionVerification(req, res, next) {
             res.locals.thisUser = thisUser;
         }
     }
-    if (config.bypass_cds_check && (req.originalUrl.startsWith('/stream') || req.originalUrl.startsWith('/content')) && (req.session.esm_verified || config.disable_esm)) {
+    if (config.bypass_cds_check && (req.originalUrl.startsWith('/stream') || req.originalUrl.startsWith('/content')) && ((req.session.esm_verified && (await esmVerify(req.session.userid, req))) || config.disable_esm)) {
         next()
-    } else if (req.session && req.session.userid && thisUser && thisUser.discord && thisUser.discord.user.id && (req.session.esm_verified || config.disable_esm)) {
+    } else if (req.session && req.session.userid && thisUser && thisUser.discord && thisUser.discord.user.id && ((req.session.esm_verified && (await esmVerify(req.session.userid, req))) || config.disable_esm)) {
         if (thisUser.discord.channels.read && thisUser.discord.channels.read.length > 0) {
             next();
         } else if (req.originalUrl && req.originalUrl === '/home') {
