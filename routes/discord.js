@@ -12,9 +12,12 @@ const { catchAsync } = require('../utils');
 const creds = btoa(`${host.discord_id}:${host.discord_secret}`);
 const { sqlSafe, sqlPromiseSafe, sqlPromiseSimple } = require('../js/sqlClient');
 const moment = require('moment');
+const geoip = require('geoip-lite');
 const persistSettingsManager = require('../js/persistSettingsManager');
 const app = require('./../app');
 const web = require("../web.config.json");
+const md5 = require('md5');
+const { getRequestIpAddress } = require('../js/ipaddress_tools')
 
 function _encode(obj) {
     let string = "";
@@ -133,7 +136,7 @@ if (config.enable_impersonation) {
     printLine("Init", `User Impersonation is ENABLED! You should never enable this on a non-localhost instance for testing only!`, 'critical');
     router.get('/impersonate/:userId', catchAsync(async (req, res) => {
         try {
-            await roleGeneration(req.params.userId, res, req)
+            await roleGeneration(req.params.userId, res, req, 950)
                 .then((config) => {
                     if (config) {
                         req.session.login_source = 100;
@@ -263,9 +266,10 @@ router.post('/update', sessionVerification, async (req, res) => {
 });
 router.post('/persistent/settings', persistSettingsManager);
 
-async function roleGeneration(id, res, req, authToken) {
-    const thisUser = app.get('userCache').rows.filter(e => id === e.userid).map(e => e.data)[0];
-    if (thisUser) {
+async function roleGeneration(id, res, req, type, authToken) {
+    let thisUser = app.get('userCache').rows.filter(e => id === e.userid).map(e => e.data)[0];
+    req.session.esm_verified = false;
+    function continueLogin() {
         if (authToken && authToken.length > 10)
             req.session.auth_token = authToken;
         res.cookie('user_token', thisUser.discord.user.token, {
@@ -273,20 +277,61 @@ async function roleGeneration(id, res, req, authToken) {
             httpOnly: true, // The cookie only accessible by the web server
             signed: true, // Indicates if the cookie should be signed
         })
-        if (req.session && req.session.login_code) {
+        if (req.sessionID && req.session.login_code) {
             sqlPromiseSafe(`DELETE FROM sequenzia_login_codes WHERE code = ? AND session = ?`, [req.session.login_code, req.sessionID], true)
             req.session.login_code = undefined;
         }
         req.session.loggedin = true;
         req.session.userid = thisUser.discord.user.id;
         res.locals.thisUser = thisUser;
-        printLine("Passport", `User ${thisUser.user.username} (${thisUser.user.id}) logged in!`, 'info');
+    }
+    if (thisUser && config.disable_esm) {
+        continueLogin();
+    } else if (thisUser) {
+        const ip_address = getRequestIpAddress(req) || null;
+        if (!ip_address) {
+            printLine("AuthorizationGenerator", `User ${id} can not login! IP Address could not resolve!`, 'warn');
+            loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
+            delete res.locals.thisUser;
+            delete req.session.userid;
+            req.session.loggedin = false;
+            thisUser = undefined;
+            req.session.esm_verified = true;
+        } else {
+            const geo = geoip.lookup(ip_address);
+            const ua = req.get('User-Agent');
+            if ((!geo || !ua) && !config.esm_allow_nogeo) {
+                printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} Location could not resolve!`, 'warn');
+                loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
+                delete res.locals.thisUser;
+                delete req.session.userid;
+                req.session.loggedin = false;
+                thisUser = undefined;
+            } else {
+                req.session.esm_verified = true;
+                console.log(geo);
+                console.log(ua);
+                continueLogin();
+                sqlPromiseSafe(`INSERT INTO sequenzia_login_history SET ? ON DUPLICATE KEY UPDATE reauth_count = reauth_count + 1, reauth_time = CURRENT_TIMESTAMP`, [{
+                    key: md5(thisUser.discord.user.id + ip_address + req.sessionID),
+                    session: req.sessionID,
+                    id: thisUser.discord.user.id,
+                    ip_address: ip_address,
+                    geo: (geo) ? JSON.stringify(geo) : null,
+                    meathod: type,
+                    user_agent: (ua) ? ua : null
+                }])
+
+                printLine("Passport", `User ${thisUser.user.username} (${thisUser.user.id}) logged in!`, 'info');
+            }
+        }
     } else {
         printLine("AuthorizationGenerator", `User ${id} is not known! No roles will be returned!`, 'warn');
         loginPage(req, res, { noLoginAvalible: 'nomember', status: 401 });
         delete res.locals.thisUser;
         delete req.session.userid;
         req.session.loggedin = false;
+        thisUser = undefined;
     }
     return thisUser
 }
@@ -323,7 +368,7 @@ async function checkAccessToken(token, req, res, redirect, next) {
             const guilds_response_json = await guilds_response.json();
             if (guilds_response_json !== undefined && guilds_response_json.length > 0)
                 req.session.guilds = guilds_response_json;
-            await roleGeneration(user_response_json.id, res, req, token)
+            await roleGeneration(user_response_json.id, res, req, 100, token)
                     .then((thisUser) => {
                         if (thisUser) {
                             req.session.login_source = 100;
@@ -463,9 +508,9 @@ async function sessionVerification(req, res, next) {
             res.locals.thisUser = thisUser;
         }
     }
-    if (config.bypass_cds_check && (req.originalUrl.startsWith('/stream') || req.originalUrl.startsWith('/content'))) {
+    if (config.bypass_cds_check && (req.originalUrl.startsWith('/stream') || req.originalUrl.startsWith('/content')) && (req.session.esm_verified || config.disable_esm)) {
         next()
-    } else if (req.session && req.session.userid && thisUser && thisUser.discord && thisUser.discord.user.id) {
+    } else if (req.session && req.session.userid && thisUser && thisUser.discord && thisUser.discord.user.id && (req.session.esm_verified || config.disable_esm)) {
         if (thisUser.discord.channels.read && thisUser.discord.channels.read.length > 0) {
             next();
         } else if (req.originalUrl && req.originalUrl === '/home') {
@@ -487,7 +532,7 @@ async function sessionVerification(req, res, next) {
             }
         } else {
             req.session.login_source = 900;
-            await roleGeneration(user[0].id, res, req)
+            await roleGeneration(user[0].id, res, req, 900)
                 .then((thisUser) => {
                     if (thisUser) {
                         next();
@@ -512,7 +557,7 @@ async function sessionVerification(req, res, next) {
                 loginPage(req, res, { noLoginAvalible: 'nomember', status: 401 });
             }
         } else {
-            await roleGeneration(user[0].id, res, req)
+            await roleGeneration(user[0].id, res, req, 102)
                 .then((thisUser) => {
                     if (thisUser) {
                         req.session.login_source = 100;
@@ -538,7 +583,7 @@ async function sessionVerification(req, res, next) {
                 loginPage(req, res);
             }
         } else {
-            await roleGeneration(user[0].id, res, req)
+            await roleGeneration(user[0].id, res, req, 101)
                 .then((thisUser) => {
                     if (thisUser) {
                         if (!req.session.login_source) {

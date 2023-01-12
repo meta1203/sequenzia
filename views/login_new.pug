@@ -79,6 +79,16 @@ html
                                         a.acceptBtn(href='/discord/destroy')
                                             i.fas.fa-sign-out-alt
                                             span Logout
+                            else if (noLoginAvalible === 'esm_activated')
+                                i.fas.fa-passport.fa-7x.center(style='padding: 0;')
+                                h3 ESM Failure
+                                p Enhanced security mode was tripped
+                                p Your session has been dropped, please contact a system administrator
+                                .formContainer
+                                    .formDiv.center
+                                        a.acceptBtn(href='/discord/destroy')
+                                            i.fas.fa-sign-out-alt
+                                            span Cancel
                             else if (noLoginAvalible === 'notelegram')
                                 i.fas.fa-passport.fa-7x.center(style='padding: 0;')
                                 h3 Account Not Found
