@@ -275,7 +275,7 @@ async function getGeoLocation(ip) {
         } else {
             geoIPLookup.removeTokens(1, async () => {
                 request.get(`http://ip-api.com/json/${ip}?fields=54783999`, {}, function (error, response, body) {
-                    if (!error && response.statusCode === 200) {
+                    if (!error && response.statusCode == 200) {
                         try {
                             const json = JSON.parse(body)
                             if (json.status === 'success') {
