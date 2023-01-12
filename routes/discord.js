@@ -480,26 +480,26 @@ async function loginPage(req, res, obj) {
                 const doesExist = await sqlPromiseSafe(`SELECT * FROM sequenzia_login_codes WHERE session = ?`, [req.sessionID])
                 if (doesExist && doesExist.rows.length === 0) {
                     async function generateLoginCode() {
-                        const setupCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-                        const results = (async () => {
-                            try {
-                                return await sqlPromiseSafe(`INSERT INTO sequenzia_login_codes SET code = ?, session = ?, expires = ?`, [setupCode, req.sessionID, moment(new Date()).add(5, 'minutes').format('YYYY-MM-DD HH:MM:00')])
-                            } catch (e) {
-                                console.error("Cant generate a new login code")
+                        try {
+                            const setupCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+                            const results = await sqlPromiseSafe(`INSERT INTO sequenzia_login_codes SET code = ?, session = ?, expires = ?`, [setupCode, req.sessionID, moment(new Date()).add(5, 'minutes').format('YYYY-MM-DD HH:MM:00')])
+                            if (!results)
                                 return undefined;
+                            return {
+                                code: setupCode,
+                                results
                             }
-                        })()
-                        if (!results)
-                            return undefined;
-                        return {
-                            code: setupCode,
-                            results
+                        } catch (err) {
+                            console.error('Can not generate login code', err);
+                            return false;
                         }
                     }
 
                     let codeTry = 0;
                     while (codeTry < 10) {
                         const codeGenerated = await generateLoginCode();
+                        if (codeGenerated === false)
+                            break;
                         if (codeGenerated && codeGenerated.results && codeGenerated.results.rows.affectedRows) {
                             req.session.login_code = codeGenerated.code
                             codeTry = 100;
