@@ -300,14 +300,7 @@ async function roleGeneration(id, res, req, type, authToken) {
         } else {
             const geo = geoip.lookup(ip_address);
             const ua = req.get('User-Agent');
-            if ((!geo || !ua) && !config.esm_allow_nogeo) {
-                printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} Location could not resolve!`, 'warn');
-                loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
-                delete res.locals.thisUser;
-                delete req.session.userid;
-                req.session.loggedin = false;
-                thisUser = undefined;
-            } else {
+            if (config.esm_allow_nogeo || (ua && geo && ((geo.city !== '' && geo.region !== '') || config.esm_allow_nocity))) {
                 req.session.esm_verified = true;
                 console.log(geo);
                 console.log(ua);
@@ -323,6 +316,13 @@ async function roleGeneration(id, res, req, type, authToken) {
                 }])
 
                 printLine("Passport", `User ${thisUser.user.username} (${thisUser.user.id}) logged in!`, 'info');
+            } else {
+                printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} Location could not resolve!`, 'warn');
+                loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
+                delete res.locals.thisUser;
+                delete req.session.userid;
+                req.session.loggedin = false;
+                thisUser = undefined;
             }
         }
     } else {
