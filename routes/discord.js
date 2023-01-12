@@ -276,6 +276,7 @@ async function getGeoLocation(ip) {
             geoIPLookup.removeTokens(1, async () => {
                 request.get(`http://ip-api.com/json/${ip}?fields=54783999`, {}, function (error, response, body) {
                     if (!error) {
+                        console.log(body)
                         try {
                             const json = JSON.parse(body)
                             if (json.status === 'success') {
@@ -345,6 +346,9 @@ async function roleGeneration(id, res, req, type, authToken) {
         } else {
             const geo = await getGeoLocation(ip_address);
             const ua = req.get('User-Agent');
+            console.log(ip_address);
+            console.log(geo);
+            console.log(ua);
             if (config.esm_kick_on_jump && req.session.loggedin && req.session.esm_key && req.session.esm_key === md5(thisUser.discord.user.id + ip_address + req.sessionID)) {
                 printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} has changed sense the last session!`, 'error');
                 failLogin();
@@ -359,9 +363,6 @@ async function roleGeneration(id, res, req, type, authToken) {
             ) {
                 req.session.esm_verified = true;
                 req.session.esm_key = md5(thisUser.discord.user.id + ip_address + req.sessionID);
-                console.log(ip_address);
-                console.log(geo);
-                console.log(ua);
                 continueLogin();
                 sqlPromiseSafe(`INSERT INTO sequenzia_login_history SET ? ON DUPLICATE KEY UPDATE reauth_count = reauth_count + 1, reauth_time = CURRENT_TIMESTAMP`, [{
                     key: req.session.esm_key,
