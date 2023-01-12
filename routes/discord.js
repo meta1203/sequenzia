@@ -343,7 +343,7 @@ async function roleGeneration(id, res, req, type, authToken) {
             printLine("AuthorizationGenerator", `User ${id} can not login! IP Address could not resolve!`, 'error');
             failLogin();
         } else {
-            const geo = getGeoLocation(ip_address);
+            const geo = await getGeoLocation(ip_address);
             const ua = req.get('User-Agent');
             if (config.esm_kick_on_jump && req.session.loggedin && req.session.esm_key && req.session.esm_key === md5(thisUser.discord.user.id + ip_address + req.sessionID)) {
                 printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} has changed sense the last session!`, 'error');
