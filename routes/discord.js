@@ -427,7 +427,14 @@ async function loginPage(req, res, obj) {
                 if (doesExist && doesExist.rows.length === 0) {
                     async function generateLoginCode() {
                         const setupCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-                        const results = await sqlPromiseSafe(`INSERT INTO sequenzia_login_codes SET code = ?, session = ?, expires = ?`, [setupCode, req.sessionID, moment(new Date()).add(1, 'hour').format('YYYY-MM-DD HH:MM:00')])
+                        const results = (async () => {
+                            try {
+                                return await sqlPromiseSafe(`INSERT INTO sequenzia_login_codes SET code = ?, session = ?, expires = ?`, [setupCode, req.sessionID, moment(new Date()).add(1, 'hour').format('YYYY-MM-DD HH:MM:00')])
+                            } catch (e) {
+                                console.error("Cant generate a new login code")
+                                return { rows: { affectedRows: 0 }};
+                            }
+                        })()
                         return {
                             code: setupCode,
                             results
