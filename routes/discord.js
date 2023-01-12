@@ -267,10 +267,11 @@ router.post('/update', sessionVerification, async (req, res) => {
 router.post('/persistent/settings', persistSettingsManager);
 
 async function esmVerify(id, req) {
-    const ip_address = (req.headers['x-real-ip']) ? req.headers['x-real-ip'] : (req.headers['x-forwarded-for']) ? req.headers['x-forwarded-for'] : null;
-    if (config.esm_noverifyjumpping || (req.session.esm_key && req.session.esm_key === md5(id + ip_address + req.sessionID))) {
+    const ip_address = req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.ip || null;
+    if (config.esm_no_verify_jumpping || (req.session.esm_key && req.session.esm_key === md5(id + ip_address + req.sessionID))) {
         return true;
     }
+    printLine("AuthorizationGenerator", `User ${id} failed to verify ESM! Re-authenticating`, 'error');
     return false;
 }
 async function roleGeneration(id, res, req, type, authToken) {
@@ -292,28 +293,30 @@ async function roleGeneration(id, res, req, type, authToken) {
         req.session.userid = thisUser.discord.user.id;
         res.locals.thisUser = thisUser;
     }
+    function failLogin() {
+        if (config.esm_lockout)
+            sqlPromiseSafe(`UPDATE discord_users_extended SET locked = 1 WHERE id = ?`, [thisUser.discord.user.id])
+        if (config.esm_lockout && config.esm_lockout_wipe_keys)
+            sqlPromiseSafe(`UPDATE discord_users_extended SET token = null, blind_token = null, token_static = null WHERE id = ?`, [thisUser.discord.user.id])
+        delete res.locals.thisUser;
+        delete req.session.userid;
+        req.session.loggedin = false;
+        thisUser = undefined;
+        loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
+    }
     if (thisUser && config.disable_esm) {
         continueLogin();
     } else if (thisUser) {
-        const ip_address = (req.headers['x-real-ip']) ? req.headers['x-real-ip'] : (req.headers['x-forwarded-for']) ? req.headers['x-forwarded-for'] : null;
+        const ip_address = req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.ip || null;
         if (!ip_address) {
-            printLine("AuthorizationGenerator", `User ${id} can not login! IP Address could not resolve!`, 'warn');
-            loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
-            delete res.locals.thisUser;
-            delete req.session.userid;
-            req.session.loggedin = false;
-            thisUser = undefined;
-            req.session.esm_verified = true;
+            printLine("AuthorizationGenerator", `User ${id} can not login! IP Address could not resolve!`, 'error');
+            failLogin();
         } else {
             const geo = geoip.lookup(ip_address);
             const ua = req.get('User-Agent');
             if (config.esm_kick_on_jump && req.session.loggedin && req.session.esm_key && req.session.esm_key === md5(thisUser.discord.user.id + ip_address + req.sessionID)) {
-                printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} has changed sense the last session!`, 'warn');
-                loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
-                delete res.locals.thisUser;
-                delete req.session.userid;
-                req.session.loggedin = false;
-                thisUser = undefined;
+                printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} has changed sense the last session!`, 'error');
+                failLogin();
             } else if (config.esm_allow_nogeo ||
                 (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) ||
                 (ua && geo &&
@@ -338,21 +341,17 @@ async function roleGeneration(id, res, req, type, authToken) {
 
                 printLine("Passport", `User ${thisUser.user.username} (${thisUser.user.id}) logged in!`, 'info');
             } else {
-                printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} Location could not resolve!`, 'warn');
-                loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
-                delete res.locals.thisUser;
-                delete req.session.userid;
-                req.session.loggedin = false;
-                thisUser = undefined;
+                printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} Location could not resolve!`, 'error');
+                failLogin();
             }
         }
     } else {
         printLine("AuthorizationGenerator", `User ${id} is not known! No roles will be returned!`, 'warn');
-        loginPage(req, res, { noLoginAvalible: 'nomember', status: 401 });
         delete res.locals.thisUser;
         delete req.session.userid;
         req.session.loggedin = false;
         thisUser = undefined;
+        loginPage(req, res, { noLoginAvalible: 'nomember', status: 401 });
     }
     return thisUser
 }
@@ -495,6 +494,8 @@ async function loginPage(req, res, obj) {
                 session: req.sessionID,
                 code: (req.session.login_code) ? req.session.login_code : undefined
             })
+        } else if (req.originalUrl && req.originalUrl === '/home') {
+            res.render('home_lite', {});
         } else {
             qrcode.toDataURL(`https://${req.headers.host}/transfer?type=0&deviceID=${decodeURIComponent(req.sessionID)}`, {
                 margin: 0.5,
@@ -568,11 +569,6 @@ async function sessionVerification(req, res, next) {
                         next();
                     } else {
                         printLine('PassportCheck', `Session Launch Failed using Static Login Token, redirecting to login`, 'warn');
-                        if (req.originalUrl && req.originalUrl === '/home') {
-                            res.render('home_lite', {});
-                        } else {
-                            loginPage(req, res, { noLoginAvalible: 'nomember', status: 401 });
-                        }
                     }
                 })
         }
@@ -594,11 +590,6 @@ async function sessionVerification(req, res, next) {
                         next();
                     } else {
                         printLine('PassportCheck', `Session Launch Failed using Blind Token, redirecting to login`, 'warn');
-                        if (req.originalUrl && req.originalUrl === '/home') {
-                            res.render('home_lite', {});
-                        } else {
-                            loginPage(req, res, { noLoginAvalible: 'nomember', status: 401 });
-                        }
                     }
                 })
         }
@@ -622,11 +613,6 @@ async function sessionVerification(req, res, next) {
                         next();
                     } else {
                         printLine('PassportCheck', `Session Launch Failed when using Cookie Login, redirecting to login`, 'warn');
-                        if (req.originalUrl && req.originalUrl === '/home') {
-                            res.render('home_lite', {});
-                        } else {
-                            loginPage(req, res, { noLoginAvalible: 'nomember', status: 401 });
-                        }
                     }
                 })
         }
