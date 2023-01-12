@@ -12,7 +12,6 @@ const { catchAsync } = require('../utils');
 const creds = btoa(`${host.discord_id}:${host.discord_secret}`);
 const { sqlSafe, sqlPromiseSafe, sqlPromiseSimple } = require('../js/sqlClient');
 const moment = require('moment');
-const geoip = require('geoip-lite');
 const persistSettingsManager = require('../js/persistSettingsManager');
 const app = require('./../app');
 const web = require("../web.config.json");
