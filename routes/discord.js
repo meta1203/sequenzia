@@ -268,10 +268,10 @@ router.post('/update', sessionVerification, async (req, res) => {
 router.post('/persistent/settings', persistSettingsManager);
 
 async function getGeoLocation(ip) {
-    return new Promise(async ok => {
-        const existingResults = (await sqlPromiseSafe(`SELECT geo FROM sequenzia_login_history WHERE ip_address = ?`, [ip]) ).rows[0]
-        if (existingResults) {
-            ok(existingResults.geo);
+    return await new Promise(async ok => {
+        const existingResults = (await sqlPromiseSafe(`SELECT geo FROM sequenzia_login_history WHERE ip_address = ?`, [ip]) ).rows
+        if (existingResults.length > 0 && existingResults[0].geo) {
+            ok(existingResults[0].geo);
         } else {
             geoIPLookup.removeTokens(1, async () => {
                 request.get(`http://ip-api.com/json/${ip}?fields=54783999`, {}, function (error, response, body) {
@@ -351,7 +351,7 @@ async function roleGeneration(id, res, req, type, authToken) {
             } else if (config.esm_no_geo ||
                 (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) ||
                 (ua && geo &&
-                    (!geo.proxy || config.esm_geo_allow_vpn) &&
+                    (!geo.proxy || config.esm_geo_allow_vpn || geo.org === 'Cloudflare WARP') &&
                     (!geo.hosting || config.esm_geo_allow_hosted) &&
                     (config.esm_geo_blocked_asn && config.esm_geo_blocked_asn.indexOf(geo.asname) === -1) &&
                     (config.esm_geo_blocked_country && config.esm_geo_blocked_country.indexOf(geo.country) === -1)
