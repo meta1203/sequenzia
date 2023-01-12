@@ -17,7 +17,9 @@ const persistSettingsManager = require('../js/persistSettingsManager');
 const app = require('./../app');
 const web = require("../web.config.json");
 const md5 = require('md5');
-const { getRequestIpAddress } = require('../js/ipaddress_tools')
+const request = require("request");
+const RateLimiter = require('limiter').RateLimiter;
+const geoIPLookup = new RateLimiter(25, 60000);
 
 function _encode(obj) {
     let string = "";
@@ -266,6 +268,35 @@ router.post('/update', sessionVerification, async (req, res) => {
 });
 router.post('/persistent/settings', persistSettingsManager);
 
+async function getGeoLocation(ip) {
+    return new Promise(async ok => {
+        const existingResults = (await sqlPromiseSafe(`SELECT geo FROM sequenzia_login_history WHERE ip_address = ?`, [ip]) ).rows[0]
+        if (existingResults) {
+            ok(existingResults.geo);
+        } else {
+            geoIPLookup.removeTokens(1, async () => {
+                request.get(`http://ip-api.com/json/${ip}?fields=54783999`, {}, function (error, response, body) {
+                    if (!error && response.statusCode === 200) {
+                        try {
+                            const json = JSON.parse(body)
+                            if (json.status === 'success') {
+                                ok(json);
+                            } else {
+                                console.error(json)
+                                ok(null);
+                            }
+                        } catch (err) {
+                            console.error(err)
+                            ok(null);
+                        }
+                    } else {
+                        ok(null);
+                    }
+                });
+            })
+        }
+    })
+}
 async function esmVerify(id, req) {
     const ip_address = req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.ip || null;
     if (config.esm_no_verify_jumpping || (req.session.esm_key && req.session.esm_key === md5(id + ip_address + req.sessionID))) {
@@ -304,6 +335,7 @@ async function roleGeneration(id, res, req, type, authToken) {
         thisUser = undefined;
         loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
     }
+
     if (thisUser && config.disable_esm) {
         continueLogin();
     } else if (thisUser) {
@@ -312,15 +344,18 @@ async function roleGeneration(id, res, req, type, authToken) {
             printLine("AuthorizationGenerator", `User ${id} can not login! IP Address could not resolve!`, 'error');
             failLogin();
         } else {
-            const geo = geoip.lookup(ip_address);
+            const geo = getGeoLocation(ip_address);
             const ua = req.get('User-Agent');
             if (config.esm_kick_on_jump && req.session.loggedin && req.session.esm_key && req.session.esm_key === md5(thisUser.discord.user.id + ip_address + req.sessionID)) {
                 printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} has changed sense the last session!`, 'error');
                 failLogin();
-            } else if (config.esm_allow_nogeo ||
+            } else if (config.esm_no_geo ||
                 (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) ||
                 (ua && geo &&
-                    ((geo.city !== '' && geo.region !== '') || config.esm_allow_nocity)
+                    (!geo.proxy || config.esm_geo_allow_vpn) &&
+                    (!geo.hosting || config.esm_geo_allow_hosted) &&
+                    (config.esm_geo_blocked_asn && config.esm_geo_blocked_asn.indexOf(geo.asname) === -1) &&
+                    (config.esm_geo_blocked_country && config.esm_geo_blocked_country.indexOf(geo.country) === -1)
                 )
             ) {
                 req.session.esm_verified = true;
