@@ -276,7 +276,6 @@ async function getGeoLocation(ip) {
             geoIPLookup.removeTokens(1, async () => {
                 request.get(`http://ip-api.com/json/${ip}?fields=54783999`, {}, function (error, response, body) {
                     if (!error) {
-                        console.log(body)
                         try {
                             const json = JSON.parse(body)
                             if (json.status === 'success') {
@@ -357,8 +356,8 @@ async function roleGeneration(id, res, req, type, authToken) {
                 (ua && geo &&
                     (!geo.proxy || config.esm_geo_allow_vpn || geo.org === 'Cloudflare WARP') &&
                     (!geo.hosting || config.esm_geo_allow_hosted) &&
-                    (config.esm_geo_blocked_asn && config.esm_geo_blocked_asn.indexOf(geo.asname) === -1) &&
-                    (config.esm_geo_blocked_country && config.esm_geo_blocked_country.indexOf(geo.country) === -1)
+                    (!config.esm_geo_blocked_asn || (config.esm_geo_blocked_asn && config.esm_geo_blocked_asn.indexOf(geo.asname) === -1)) &&
+                    (!config.esm_geo_blocked_country || (config.esm_geo_blocked_country && config.esm_geo_blocked_country.indexOf(geo.country) === -1))
                 )
             ) {
                 req.session.esm_verified = true;
