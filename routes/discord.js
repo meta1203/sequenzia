@@ -300,7 +300,7 @@ async function roleGeneration(id, res, req, type, authToken) {
         } else {
             const geo = geoip.lookup(ip_address);
             const ua = req.get('User-Agent');
-            if (config.esm_allow_nogeo || (ua && geo && ((geo.city !== '' && geo.region !== '') || config.esm_allow_nocity))) {
+            if (config.esm_allow_nogeo || (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) ||(ua && geo && ((geo.city !== '' && geo.region !== '') || config.esm_allow_nocity))) {
                 req.session.esm_verified = true;
                 console.log(geo);
                 console.log(ua);
