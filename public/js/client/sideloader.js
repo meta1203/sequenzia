@@ -536,7 +536,7 @@ async function requestCompleted (response, url, lastURL, push) {
             type: 'error',
             title: 'No Results Found',
             subtitle: 'Error',
-            content: `Nothing was found, Please try another option or search term`,
+            content: `<p>Nothing was found, Please try another option or search term</p><br/><a class="btn btn-danger w-100" href='#_' onclick="getNewContent([],[['nsfw','true']],"${url}"}); return false;"><i class="fas fa-turn-down-left pr-2"></i>Include NSFW</a><br/><a class="btn btn-danger w-100" href='#_' onclick="getNewContent(['limit', 'responseType', 'key', 'blind_key', 'offset', 'sort', 'color', 'date', 'displayname', 'history', 'pins', 'cached', 'history_screen', 'require_score', 'newest', 'displaySlave', 'flagged', 'datestart', 'dateend', 'history_numdays', 'fav_numdays', 'numdays', 'ratio', 'minres', 'dark', 'filesonly', 'nocds', 'setscreen', 'screen', 'nohistory', 'reqCount'],[['nsfw','true']],"${url}"}); return false;"><i class="fas fa-turn-down-left pr-2"></i>Without Filters</a>`,
             delay: 10000,
         });
         responseComplete = true
@@ -3467,7 +3467,8 @@ async function showSearchOptions(post) {
         }
         return false
     })();
-    let postBody = _post.getAttribute('data-msg-bodyraw') + '';
+    const postBodyRaw = _post.getAttribute('data-msg-bodyraw') + '';
+    let postBody = postBodyRaw;
     const postFlagged = _post.getAttribute('data-msg-flagged') + '' === 'true';
     const postIsVideo = _post.getAttribute('data-msg-isvideo') + '' === 'true';
     const postIsAudio = _post.getAttribute('data-msg-isaudio') + '' === 'true';
@@ -3495,6 +3496,8 @@ async function showSearchOptions(post) {
     const modalSearchByParent = document.getElementById(`searchByParent`);
     const modalSearchByColor = document.getElementById(`searchByColor`);
     const modalSearchByID = document.getElementById(`searchByID`);
+    const modalSearchByContent = document.getElementById(`searchByContents`);
+    const modalSearchByChildren = document.getElementById(`searchByChildren`);
     const modalBodyRaw = document.getElementById(`rawBodyContent`);
     const modalInfoRaw = document.getElementById(`rawInfoContent`);
     const modalAuthorData = document.getElementById(`authorData`);
@@ -4018,13 +4021,16 @@ async function showSearchOptions(post) {
         modalGoToHistoryDisplay.classList.add('hidden')
     }
     if (searchUser && searchUser.length > 0) {
+        const artistStrting = decodeURIComponent(searchUser)
+        modalSearchByUser.querySelector('span').innerText = `Artist (${(artistStrting.length > 16) ? artistStrting.slice(0,16) + '...' : artistStrting})`;
         modalSearchByUser.onclick = function() {
             $('#searchModal').modal('hide');
-            window.location.assign(`#${getLocation()}search=${encodeURIComponent('text:' + searchUser)}${(nsfwString) ? nsfwString : ''}`);
+            window.location.assign(`#${getLocation()}search=${encodeURIComponent('artist:' + searchUser)}${(nsfwString) ? nsfwString : ''}`);
             return false;
         }
         modalSearchByUser.classList.remove('hidden')
     } else {
+        modalSearchByUser.querySelector('span').innerText = `Artist`;
         modalSearchByUser.onclick = function() { return false; };
         modalSearchByUser.classList.add('hidden')
     }
@@ -4079,6 +4085,35 @@ async function showSearchOptions(post) {
         postBody = postBody.join('<br/>')
     }
     if (postBody && postBody.length > 0) {
+        modalSearchByContent.onclick = function() {
+            $('#searchModal').modal('hide');
+            window.location.assign(`#${getLocation()}search=${encodeURIComponent('text:' + postBodyRaw.trim())}${(nsfwString) ? nsfwString : ''}`);
+            return false;
+        }
+        modalSearchByContent.classList.remove('hidden');
+
+        modalSearchByChildren.classList.add('hidden');
+        if (postBody.includes('Twitter Image')) {
+            if (postFilename && postFilename.length > 0) {
+                modalSearchByChildren.onclick = function() {
+                    $('#searchModal').modal('hide');
+                    window.location.assign(`#${getLocation()}search=${encodeURIComponent('name:' + postFilename)}${(nsfwString) ? nsfwString : ''}`);
+                    return false;
+                }
+                modalSearchByChildren.classList.remove('hidden');
+            }
+        } else if (postBody.includes('**🎆 ') && postBody.includes(' (')) {
+            const isMeta = postBody.split('** : ***')
+            if (isMeta.length > 1 && isMeta.pop().includes('[') && isMeta.pop().includes('/')) {
+                const findId = isMeta.pop().split('[').pop().split(']')[0];
+                modalSearchByChildren.onclick = function() {
+                    $('#searchModal').modal('hide');
+                    window.location.assign(`#${getLocation()}search=${encodeURIComponent('text: [' + findId + '] ')}${(nsfwString) ? nsfwString : ''}`);
+                    return false;
+                }
+                modalSearchByChildren.classList.remove('hidden');
+            }
+        }
         try {
             const regexItalic = /\*\*\*(.*?)\*\*\*/g;
             while (postBody.includes('***')) {
@@ -4096,12 +4131,13 @@ async function showSearchOptions(post) {
             console.error(`Failed to prettyfy the post body!`)
             console.error(e)
         }
-
-        modalBodyRaw.querySelector('div').innerHTML = postBody
-        modalBodyRaw.classList.remove('hidden')
+        modalBodyRaw.querySelector('div').innerHTML = postBody;
+        modalBodyRaw.classList.remove('hidden');
     } else {
         modalBodyRaw.querySelector('div').innerHTML = ''
         modalBodyRaw.classList.add('hidden')
+        modalSearchByContent.classList.add('hidden');
+        modalSearchByChildren.classList.add('hidden');
     }
     if (postTags && postTags.length > 0) {
         modelTagsHeader.classList.remove('hidden');

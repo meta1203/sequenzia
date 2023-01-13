@@ -244,6 +244,10 @@ a.lightbox:before {
     width: 50em;
 }
 
+#photoInfo {
+    display: flex;
+}
+
 .modal-backdrop {
     background-color: #000;
 }
@@ -1619,9 +1623,9 @@ select.form-control:focus::-ms-value {
 .album-list .half-full, .album-list .half-center {
     padding-top: 62%;
 }
-.bottom-time-info {
+/*.bottom-time-info {
     width: 380px;
-}
+}*/
 div#time {
     font-weight: 400;
     line-height: 1em;
@@ -1710,10 +1714,10 @@ div#time {
         margin-right: 0;
     }
 
-    .bottom-time-info {
+    /*.bottom-time-info {
         width: 250px;
         margin-right: auto;
-    }
+    }*/
     div#time {
         font-weight: 400;
         line-height: 1em;
@@ -1723,9 +1727,9 @@ div#time {
 }
 
 @media (max-height:500px) {
-    .bottom-time-info {
+    /*.bottom-time-info {
         width: 250px;
-    }
+    }*/
     div#time {
         font-weight: 400;
         line-height: 1em;

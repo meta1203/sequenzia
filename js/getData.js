@@ -531,7 +531,6 @@ module.exports = async (req, res, next) => {
         function getType(i) {
             let _id = i;
             if (_id.startsWith('id:')) {
-                bypassNSFWFilter = true;
                 _id = i.split('id:')[1];
                 if (_id.startsWith('st:')) {
                     _id = _id.split('st:')[1]
@@ -543,7 +542,6 @@ module.exports = async (req, res, next) => {
                     return `kanmi_records.id LIKE '%${_id}%'`
                 }
             } else if (i.startsWith('eid:')) {
-                bypassNSFWFilter = true;
                 _id = i.split('eid:')[1];
                 if (_id.startsWith('st:')) {
                     _id = _id.split('st:')[1]
@@ -558,6 +556,7 @@ module.exports = async (req, res, next) => {
                     _id = _id.split('lt:')[1]
                     return `kanmi_records.eid <= '${_id}'`
                 } else {
+                    bypassNSFWFilter = true;
                     return `kanmi_records.eid = '${_id}'`
                 }
             } else if (i.startsWith('artist:')) {
@@ -1999,6 +1998,8 @@ module.exports = async (req, res, next) => {
                                     if (decoded_content.includes(' by ')) {
                                         user_search = decoded_content.split(' by ').pop().split('\n')[0]
                                     }
+                                } else if (decoded_content.includes('@')) {
+                                    user_search = '@' + clean_content.split('@').pop().split(' ')[0]
                                 } else {
                                     user_search = clean_content.split(' by ').pop().split('***')[0].split('**')[0]
                                 }
