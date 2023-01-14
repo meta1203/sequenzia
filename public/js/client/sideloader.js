@@ -1114,11 +1114,13 @@ function getSearchContent(element, tagsElement, url) {
                 _params.set('nsfw', 'true')
             }
             if (searchText !== null && searchText !== '') {
+                _params.delete('search')
                 _params.set('search', searchText);
             } else {
                 _params.delete('search')
             }
             if (searchTags && searchTags !== '') {
+                _params.delete('tags')
                 _params.set('tags', searchTags);
             } else {
                 _params.delete('tags')
@@ -4204,7 +4206,13 @@ async function showSearchOptions(post) {
 }
 function getLocation(url, tags) {
     const l = document.getElementById(((tags) ? 'tag' : 'search') + 'LocationSelection').querySelector('.active').getAttribute('data-search-location')
-    return (l.split('?').pop().length > 0) ? l + '&' : l
+    if (l.split('?').pop().length > 0) {
+        const _p = new URLSearchParams('?' + l.split('?').pop())
+        _p.delete((tags) ? 'tags' : 'search');
+        return l.split('?')[0] + '?' + _p.toString() + '&'
+    } else {
+        return l
+    }
 }
 
 function showAuthManager() {
