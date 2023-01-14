@@ -729,7 +729,13 @@ function readValidation(req, res, next) {
     }
 }
 function downloadValidation(req, res, next) {
-    const thisUser = res.locals.thisUser
+    let thisUser = null;
+    if (req.session && req.session.userid) {
+        thisUser = app.get('userCache').rows.filter(e => req.session.userid === e.userid).map(e => e.data)[0];
+        if (thisUser) {
+            res.locals.thisUser = thisUser;
+        }
+    }
     if (config.bypass_cds_check) {
         next()
     } else if (req.originalUrl && (req.originalUrl.startsWith('/content/link/') || req.originalUrl.startsWith('/content/json/'))) {
