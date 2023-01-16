@@ -323,7 +323,7 @@ async function roleGeneration(id, res, req, type, authToken) {
         req.session.userid = thisUser.discord.user.id;
         res.locals.thisUser = thisUser;
     }
-    function failLogin() {
+    function failLogin(code) {
         if (config.esm_lockout)
             sqlPromiseSafe(`UPDATE discord_users_extended SET locked = 1 WHERE id = ?`, [thisUser.discord.user.id])
         if (config.esm_lockout && config.esm_lockout_wipe_keys)
@@ -332,7 +332,7 @@ async function roleGeneration(id, res, req, type, authToken) {
         delete req.session.userid;
         req.session.loggedin = false;
         thisUser = undefined;
-        loginPage(req, res, { noLoginAvalible: 'esm_activated', status: 401 });
+        loginPage(req, res, { noLoginAvalible: 'esm_activated', serverError: code,status: 401 });
     }
 
     if (thisUser && config.disable_esm) {
@@ -341,7 +341,7 @@ async function roleGeneration(id, res, req, type, authToken) {
         const ip_address = req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.ip || null;
         if (!ip_address) {
             printLine("AuthorizationGenerator", `User ${id} can not login! IP Address could not resolve!`, 'error');
-            failLogin();
+            failLogin('0001');
         } else {
             const geo = await getGeoLocation(ip_address);
             const ua = req.get('User-Agent');
@@ -350,7 +350,7 @@ async function roleGeneration(id, res, req, type, authToken) {
             console.log(ua);
             if (config.esm_kick_on_jump && req.session.loggedin && req.session.esm_key && req.session.esm_key === md5(thisUser.discord.user.id + ip_address + req.sessionID)) {
                 printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} has changed sense the last session!`, 'error');
-                failLogin();
+                failLogin('0003');
             } else if (config.esm_no_geo ||
                 (config.esm_allow_ip && config.esm_allow_ip.map(f => ip_address.startsWith(f)).filter(f => !!f).length > 0 ) ||
                 (ua && geo &&
@@ -376,7 +376,7 @@ async function roleGeneration(id, res, req, type, authToken) {
                 printLine("Passport", `User ${thisUser.user.username} (${thisUser.user.id}) logged in!`, 'info');
             } else {
                 printLine("AuthorizationGenerator", `User ${id} can not login! ${ip_address} Location could not resolve!`, 'error');
-                failLogin();
+                failLogin('0002');
             }
         }
     } else {
@@ -473,7 +473,7 @@ async function loginPage(req, res, obj) {
         if (obj && obj.keepSession) {
             req.session.loggedin = false;
         }
-        res.status(((obj && obj.status) ? obj.status : 403)).render('login_new', _obj);
+        res.status(((obj && obj.status) ? obj.status : 403)).render('login_new2', _obj);
     } else {
         try {
             async function tryToGenerateCode() {
@@ -548,7 +548,7 @@ async function loginPage(req, res, obj) {
                     if (req.session.login_code) {
                         _obj.login_code = req.session.login_code;
                     }
-                    res.status(((obj && obj.status) ? obj.status : 403)).render('login_new', _obj);
+                    res.status(((obj && obj.status) ? obj.status : 403)).render('login_new2', _obj);
                 });
         }
     }
