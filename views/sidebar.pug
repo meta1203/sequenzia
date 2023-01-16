@@ -73,7 +73,7 @@ html
                                         each thisServer, indexServer in server.sort()
                                             - _channels = thisClass.entities.filter((e) => { return e.server === thisServer.id && e.type === 0})
                                             if (_channels.length > 0)
-                                                .collapse-header
+                                                .collapse-header.ml-2
                                                     i.fas.fa-database.pr-1
                                                     span #{thisServer.name}
                                                 if (_channels.length > 2)
