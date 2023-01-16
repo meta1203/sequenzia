@@ -473,7 +473,7 @@ async function loginPage(req, res, obj) {
         if (obj && obj.keepSession) {
             req.session.loggedin = false;
         }
-        res.status(((obj && obj.status) ? obj.status : 403)).render('login_new2', _obj);
+        res.status(((obj && obj.status) ? obj.status : 403)).render((webconfig.use_classic_login) ? 'login_new2' : 'login_new', _obj);
     } else {
         try {
             async function tryToGenerateCode() {
@@ -548,7 +548,7 @@ async function loginPage(req, res, obj) {
                     if (req.session.login_code) {
                         _obj.login_code = req.session.login_code;
                     }
-                    res.status(((obj && obj.status) ? obj.status : 403)).render('login_new2', _obj);
+                    res.status(((obj && obj.status) ? obj.status : 403)).render((webconfig.use_classic_login) ? 'login_new2' : 'login_new', _obj);
                 });
         }
     }
