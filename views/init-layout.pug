@@ -37,14 +37,14 @@ html
         meta(charset='utf-8')
         meta(http-equiv='X-UA-Compatible', content='IE=edge')
         meta(name='viewport', content='width=device-width, initial-scale=1, shrink-to-fit=yes, viewport-fit=cover, user-scalable=no')
-        meta(name='description', content='Sequenzia')
+        meta(name='description', content=webconf.site_name || 'Sequenzia')
         meta(name='author', content='Yukimi Kazari')
         meta(name="apple-mobile-web-app-capable" content="yes")
-        meta(name="pple-mobile-web-app-title" content="Sequenzia")
+        meta(name="pple-mobile-web-app-title" content=webconf.site_name || "Sequenzia")
         meta(name="apple-mobile-web-app-status-bar-style" content="black-translucent")
-        meta(content="Sequenzia" property="og:title")
+        meta(content=webconf.site_name || "Sequenzia" property="og:title")
         meta(content="Image Gallery and File Manager" property="og:description")
-        meta(content="Sequenzia" property="og:site_name")
+        meta(content=webconf.site_name || "Sequenzia" property="og:site_name")
         meta(name="theme-color" content="#000" media="(prefers-color-scheme: light)")
         meta(name="theme-color" content="#000" media="(prefers-color-scheme: dark)")
         //meta(name="theme-color" content="#4285f4")
@@ -511,7 +511,7 @@ html
                                                         | About
                                                     if (login_source && login_source < 900)
                                                         a.user-menu-item.user-menu-small(data-placement="left" title="Authentication Manager" href='#_' onclick='showAuthManager(); return false;')
-                                                            i.fa-light.fa-key
+                                                            i.fa-light.fa-cog
                                                             | Account
                                                     a.user-menu-item.user-menu-small(title="Logout" href='#_' data-toggle='modal' data-target='#logoutModal')
                                                         i.fa-light.fa-sign-out-alt
@@ -1522,7 +1522,7 @@ html
                     .modal-content
                         .modal-header
                             h5.modal-title
-                                i.fas.fa-key.pr-2
+                                i.fas.fa-cog.pr-2
                                 | Account
                             button.close.text-white(type='button' data-dismiss='modal' aria-label='Close')
                                 span(aria-hidden='true') &times;

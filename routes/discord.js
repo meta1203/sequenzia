@@ -466,6 +466,8 @@ async function loginPage(req, res, obj) {
     }
     if (webconfig.system_banner)
         _obj.banner = webconfig.system_banner;
+    if (webconfig.site_name)
+        _obj.site_name = webconfig.site_name;
     if (config.enable_impersonation)
         _obj.show_user_list = true
     sessionTransfer(req);
@@ -473,7 +475,7 @@ async function loginPage(req, res, obj) {
         if (obj && obj.keepSession) {
             req.session.loggedin = false;
         }
-        res.status(((obj && obj.status) ? obj.status : 403)).render((webconfig.use_classic_login) ? 'login_new2' : 'login_new', _obj);
+        res.status(((obj && obj.status) ? obj.status : 403)).render((webconfig.use_classic_login) ? 'login_new' : 'login_new2', _obj);
     } else {
         try {
             async function tryToGenerateCode() {
@@ -548,7 +550,7 @@ async function loginPage(req, res, obj) {
                     if (req.session.login_code) {
                         _obj.login_code = req.session.login_code;
                     }
-                    res.status(((obj && obj.status) ? obj.status : 403)).render((webconfig.use_classic_login) ? 'login_new2' : 'login_new', _obj);
+                    res.status(((obj && obj.status) ? obj.status : 403)).render((webconfig.use_classic_login) ? 'login_new' : 'login_new2', _obj);
                 });
         }
     }
