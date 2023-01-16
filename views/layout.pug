@@ -1615,7 +1615,7 @@ html
                         div#topbarBackground
                             //(style='display: none;')
 
-                    .container-fluid.max-resize(class=`${(path === '/listTheater' && params.has('show_id')) ? 'thin-width' : ''}`)
+                    .container-fluid.max-resize(onClick=`$('#userMenu').collapse('hide')` class=`${(path === '/listTheater' && params.has('show_id')) ? 'thin-width' : ''}`)
                         #hiddenItemsAlert.alert.alert-danger-transparent.hidden(role="alert")
                             .row
                                 .col-auto.align-self-start.align-self-center
